@@ -68,7 +68,7 @@ class LangChainService:
 
     def __init__(self):
         """Initialize LangChain with Gemini API"""
-        self.model_name = "gemini-1.5-flash"
+        self.model_name = "gemini-2.5-flash"
         self.temperature = 0.7
         self.llm = None
         self.parser = JsonOutputParser()
