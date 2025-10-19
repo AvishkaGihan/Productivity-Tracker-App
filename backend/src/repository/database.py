@@ -4,7 +4,7 @@ Database configuration and initialization for SQLite with SQLAlchemy ORM
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Generator, Optional
 
 from sqlalchemy import (
@@ -55,7 +55,7 @@ class User(Base):
     goals: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     def __repr__(self):
@@ -74,7 +74,7 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     def __repr__(self):
