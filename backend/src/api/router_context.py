@@ -4,52 +4,18 @@ These are used as context for AI suggestion generation
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.dependencies import get_authenticated_user
 from src.repository.database import get_db
 from src.repository.repositories import UserRepository
 from src.schemas import ContextUpdate, ErrorResponse, UserResponse
-from src.services.auth_service import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ============================================================================
-# DEPENDENCY: Get Authenticated User
-# ============================================================================
-
-
-async def get_auth_user(
-    authorization: Optional[str] = None, db: Session = Depends(get_db)
-):
-    """Extract user from Authorization header token"""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-        )
-
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-        )
-
-    token = parts[1]
-    user = get_current_user(db, token)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
-        )
-
-    return user
 
 
 # ============================================================================
@@ -66,7 +32,9 @@ async def get_auth_user(
         401: {"model": ErrorResponse, "description": "Unauthorized"},
     },
 )
-async def get_user_context(user=Depends(get_auth_user), db: Session = Depends(get_db)):
+async def get_user_context(
+    user=Depends(get_authenticated_user), db: Session = Depends(get_db)
+):
     """
     Get the authenticated user's goals and notes
 
@@ -107,7 +75,7 @@ async def get_user_context(user=Depends(get_auth_user), db: Session = Depends(ge
 )
 async def update_user_context(
     context_data: ContextUpdate,
-    user=Depends(get_auth_user),
+    user=Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -160,7 +128,7 @@ async def update_user_context(
     },
 )
 async def get_profile_with_context(
-    user=Depends(get_auth_user), db: Session = Depends(get_db)
+    user=Depends(get_authenticated_user), db: Session = Depends(get_db)
 ):
     """
     Get the authenticated user's full profile including goals and notes
@@ -188,7 +156,7 @@ async def get_profile_with_context(
     },
 )
 async def clear_user_context(
-    user=Depends(get_auth_user), db: Session = Depends(get_db)
+    user=Depends(get_authenticated_user), db: Session = Depends(get_db)
 ):
     """
     Clear the authenticated user's goals and notes
@@ -268,7 +236,9 @@ async def get_context_guidelines():
     "/validate",
     status_code=status.HTTP_200_OK,
 )
-async def validate_context(context_data: ContextUpdate, user=Depends(get_auth_user)):
+async def validate_context(
+    context_data: ContextUpdate, user=Depends(get_authenticated_user)
+):
     """
     Validate context before saving
 

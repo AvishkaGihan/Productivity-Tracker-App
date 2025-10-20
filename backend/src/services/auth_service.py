@@ -127,6 +127,9 @@ def register_user(
 
     Returns:
         Tuple of (success, message, user)
+        - success: True if registration successful
+        - message: Success or error message
+        - user: User object if successful, None otherwise
     """
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
@@ -168,6 +171,9 @@ def authenticate_user(
 
     Returns:
         Tuple of (success, message, user)
+        - success: True if authentication successful
+        - message: Success or error message
+        - user: User object if successful, None otherwise
     """
     # Find user by email
     user = db.query(User).filter(User.email == email).first()

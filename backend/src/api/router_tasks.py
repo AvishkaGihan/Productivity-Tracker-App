@@ -3,11 +3,11 @@ Task management API endpoints - CRUD operations for tasks
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from src.dependencies import get_authenticated_user
 from src.repository.database import get_db
 from src.repository.repositories import TaskRepository
 from src.schemas import (
@@ -17,44 +17,10 @@ from src.schemas import (
     TaskResponse,
     TaskUpdate,
 )
-from src.services.auth_service import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ============================================================================
-# DEPENDENCY: Get Authenticated User
-# ============================================================================
-
-
-async def get_auth_user(
-    authorization: Optional[str] = None, db: Session = Depends(get_db)
-):
-    """Extract user from Authorization header token"""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-        )
-
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-        )
-
-    token = parts[1]
-    user = get_current_user(db, token)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
-        )
-
-    return user
 
 
 # ============================================================================
@@ -72,7 +38,9 @@ async def get_auth_user(
     },
 )
 async def create_task(
-    task_data: TaskCreate, user=Depends(get_auth_user), db: Session = Depends(get_db)
+    task_data: TaskCreate,
+    user=Depends(get_authenticated_user),
+    db: Session = Depends(get_db),
 ):
     """
     Create a new task for the authenticated user
@@ -107,7 +75,7 @@ async def create_task(
 )
 async def get_tasks(
     status_filter: str = Query(None, description="Filter: all, completed, pending"),
-    user=Depends(get_auth_user),
+    user=Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -149,7 +117,7 @@ async def get_tasks(
     },
 )
 async def get_task(
-    task_id: int, user=Depends(get_auth_user), db: Session = Depends(get_db)
+    task_id: int, user=Depends(get_authenticated_user), db: Session = Depends(get_db)
 ):
     """
     Get a specific task by ID
@@ -191,7 +159,7 @@ async def get_task(
 async def update_task(
     task_id: int,
     task_data: TaskUpdate,
-    user=Depends(get_auth_user),
+    user=Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -242,7 +210,7 @@ async def update_task(
     },
 )
 async def delete_task(
-    task_id: int, user=Depends(get_auth_user), db: Session = Depends(get_db)
+    task_id: int, user=Depends(get_authenticated_user), db: Session = Depends(get_db)
 ):
     """
     Delete a specific task
@@ -288,7 +256,9 @@ async def delete_task(
         401: {"model": ErrorResponse, "description": "Unauthorized"},
     },
 )
-async def get_statistics(user=Depends(get_auth_user), db: Session = Depends(get_db)):
+async def get_statistics(
+    user=Depends(get_authenticated_user), db: Session = Depends(get_db)
+):
     """
     Get task statistics for the authenticated user
 

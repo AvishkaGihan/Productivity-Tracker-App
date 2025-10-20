@@ -20,10 +20,11 @@ class UserRegister(BaseModel):
         ..., min_length=8, description="Password (minimum 8 characters)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {"email": "user@example.com", "password": "password123"}
         }
+    }
 
 
 class UserLogin(BaseModel):
@@ -32,10 +33,11 @@ class UserLogin(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., description="User password")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {"email": "user@example.com", "password": "password123"}
         }
+    }
 
 
 class UserResponse(BaseModel):
@@ -47,9 +49,9 @@ class UserResponse(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
             "example": {
                 "id": 1,
                 "email": "user@example.com",
@@ -57,7 +59,8 @@ class UserResponse(BaseModel):
                 "notes": "Starting backend development",
                 "created_at": "2025-10-18T12:00:00",
             }
-        }
+        },
+    }
 
 
 class TokenResponse(BaseModel):
@@ -78,10 +81,11 @@ class TaskCreate(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=255, description="Task title")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {"title": "Implement authentication API endpoints"}
         }
+    }
 
 
 class TaskUpdate(BaseModel):
@@ -92,13 +96,14 @@ class TaskUpdate(BaseModel):
     )
     is_completed: Optional[bool] = Field(None, description="Completion status")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "title": "Implement authentication API endpoints",
                 "is_completed": False,
             }
         }
+    }
 
 
 class TaskResponse(BaseModel):
@@ -110,9 +115,9 @@ class TaskResponse(BaseModel):
     is_completed: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
             "example": {
                 "id": 1,
                 "user_id": 1,
@@ -120,7 +125,8 @@ class TaskResponse(BaseModel):
                 "is_completed": False,
                 "created_at": "2025-10-18T12:00:00",
             }
-        }
+        },
+    }
 
 
 class TaskListResponse(BaseModel):
@@ -143,13 +149,14 @@ class ContextUpdate(BaseModel):
     goals: Optional[str] = Field(None, description="User's goals (text)")
     notes: Optional[str] = Field(None, description="User's notes (text)")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "goals": "Learn FastAPI, build a portfolio project, master LangChain",
                 "notes": "Currently focused on backend development with AI integration",
             }
         }
+    }
 
 
 class ContextResponse(BaseModel):
@@ -158,8 +165,7 @@ class ContextResponse(BaseModel):
     goals: Optional[str] = None
     notes: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # ============================================================================
@@ -172,12 +178,13 @@ class AISuggestionRequest(BaseModel):
 
     query: str = Field(..., min_length=1, description="Natural language query for AI")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "query": "Suggest tasks based on my goals to improve productivity"
             }
         }
+    }
 
 
 class SuggestedTask(BaseModel):
@@ -201,8 +208,8 @@ class AISuggestionResponse(BaseModel):
         None, description="User's goals and notes context sent to AI"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "success": True,
                 "suggestions": [
@@ -219,6 +226,7 @@ class AISuggestionResponse(BaseModel):
                 "query_context": "Goals: Learn FastAPI, build portfolio. Notes: Backend focus.",
             }
         }
+    }
 
 
 # ============================================================================
@@ -233,11 +241,12 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = Field(None, description="Detailed error information")
     code: Optional[str] = Field(None, description="Error code")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "error": "Invalid credentials",
                 "detail": "Email or password is incorrect",
                 "code": "AUTH_001",
             }
         }
+    }

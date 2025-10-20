@@ -10,10 +10,10 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.router_auth import router as router_auth
-from src.api.router_tasks import router as router_tasks
 from src.api.router_ai import router as router_ai
+from src.api.router_auth import router as router_auth
 from src.api.router_context import router as router_context
+from src.api.router_tasks import router as router_tasks
 from src.repository.database import init_db
 
 # Load environment variables
@@ -46,16 +46,20 @@ app = FastAPI(
 )
 
 # CORS middleware configuration
+# Get allowed origins from environment or use defaults for development
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:8081,http://127.0.0.1:3000,http://127.0.0.1:8081,http://127.0.0.1:8000",
+).split(",")
+
+# Only allow wildcard in development
+environment = os.getenv("ENVIRONMENT", "development")
+if environment == "development":
+    allowed_origins.append("*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:8081",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8081",
-        "http://127.0.0.1:8000",
-        "*",  # For development only - restrict in production
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -3,6 +3,7 @@ Authentication API endpoints - Register, Login, Get Current User
 """
 
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
@@ -32,7 +33,7 @@ router = APIRouter()
 # ============================================================================
 
 
-def get_token_from_header(authorization: str | None) -> str:
+def get_token_from_header(authorization: Optional[str]) -> str:
     """Extract and validate Bearer token from Authorization header"""
     if not authorization:
         raise HTTPException(
@@ -75,10 +76,10 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """
     success, message, user = register_user(db, user_data)
 
-    if not success:
+    if not success or not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
-    logger.info(f"User registered: {user.email}")  # type: ignore
+    logger.info(f"User registered: {user.email}")
     return create_token_response(user)
 
 
@@ -107,11 +108,11 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         db, credentials.email, credentials.password
     )
 
-    if not success:
+    if not success or not user:
         logger.warning(f"Login failed for email: {credentials.email}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message)
 
-    logger.info(f"User logged in: {user.email}")  # type: ignore
+    logger.info(f"User logged in: {user.email}")
     return create_token_response(user)
 
 
@@ -130,7 +131,7 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     },
 )
 async def get_current_user_profile(
-    authorization: str | None = Header(None), db: Session = Depends(get_db)
+    authorization: Optional[str] = Header(None), db: Session = Depends(get_db)
 ):
     """
     Get current authenticated user's profile
@@ -147,7 +148,7 @@ async def get_current_user_profile(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    logger.info(f"User profile retrieved: {user.email}")  # type: ignore
+    logger.info(f"User profile retrieved: {user.email}")
     return UserResponse.model_validate(user)
 
 
@@ -161,7 +162,7 @@ async def get_current_user_profile(
     status_code=status.HTTP_200_OK,
     responses={200: {"description": "Logout successful"}},
 )
-async def logout(authorization: str | None = Header(None)):
+async def logout(authorization: Optional[str] = Header(None)):
     """
     Logout endpoint (token is managed on frontend)
 

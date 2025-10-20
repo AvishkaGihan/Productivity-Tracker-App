@@ -3,11 +3,11 @@ AI suggestion API endpoints - LangChain/Gemini integration for task suggestions
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.dependencies import get_authenticated_user
 from src.repository.database import get_db
 from src.repository.repositories import TaskRepository
 from src.schemas import (
@@ -16,45 +16,11 @@ from src.schemas import (
     ErrorResponse,
     TaskResponse,
 )
-from src.services.auth_service import get_current_user
 from src.services.langchain_service import langchain_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ============================================================================
-# DEPENDENCY: Get Authenticated User
-# ============================================================================
-
-
-async def get_auth_user(
-    authorization: Optional[str] = None, db: Session = Depends(get_db)
-):
-    """Extract user from Authorization header token"""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-        )
-
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-        )
-
-    token = parts[1]
-    user = get_current_user(db, token)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
-        )
-
-    return user
 
 
 # ============================================================================
@@ -74,7 +40,7 @@ async def get_auth_user(
 )
 async def generate_suggestions(
     request: AISuggestionRequest,
-    user=Depends(get_auth_user),
+    user=Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -162,7 +128,7 @@ async def check_ai_health():
 )
 async def suggest_and_create_tasks(
     request: AISuggestionRequest,
-    user=Depends(get_auth_user),
+    user=Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
     """
