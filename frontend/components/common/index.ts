@@ -26,3 +26,5 @@ export { LoadingState, Skeleton } from "./LoadingState";
 export type { LoadingVariant } from "./LoadingState";
 
 export { ErrorState } from "./ErrorState";
+
+export { getStatusBarHeight, SafeAreaWrapper } from "./SafeAreaWrapper";

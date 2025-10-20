@@ -4,6 +4,7 @@ export { default as ContextScreen } from "./ContextScreen";
 export { default as DashboardScreen } from "./DashboardScreen";
 export { default as ForgotPasswordScreen } from "./ForgotPasswordScreen";
 export { default as LoginScreen } from "./LoginScreen";
+export { NotificationSettingsScreen } from "./NotificationSettingsScreen";
 export { default as OnboardingScreen } from "./OnboardingScreen";
 export { default as RegisterScreen } from "./RegisterScreen";
 export { default as TaskListScreen } from "./TaskListScreen";
