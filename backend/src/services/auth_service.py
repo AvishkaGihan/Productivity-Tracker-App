@@ -17,7 +17,11 @@ from src.schemas import TokenResponse, UserRegister, UserResponse
 logger = logging.getLogger(__name__)
 
 # Password hashing configuration
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+)
 
 # JWT configuration
 SECRET_KEY = os.getenv(
