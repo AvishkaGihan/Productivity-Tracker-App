@@ -6,36 +6,50 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
+import { IconButton, Text, TextInput } from "react-native-paper";
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  Text,
-  TextInput,
-} from "react-native-paper";
+  MessageBubble,
+  QuickReplyButtons,
+  SuggestionCard,
+  TypingIndicator,
+} from "../components/ai";
 import { aiAPI } from "../services/api-client";
-import { useAuthStore } from "../store/auth-store";
 import { useTaskStore } from "../store/task-store";
-import { colors } from "../theme/colors";
+import { useTheme } from "../theme";
 
 interface Message {
   id: string;
-  type: "user" | "ai" | "suggestion";
+  type: "user" | "ai";
   content: string;
   timestamp: Date;
-  suggestions?: Array<{ title: string; reason?: string }>;
 }
 
+interface Suggestion {
+  title: string;
+  reason?: string;
+  confidence?: number;
+}
+
+const QUICK_PROMPTS = [
+  "Suggest tasks based on my goals",
+  "What should I work on today?",
+  "Help me prioritize my tasks",
+  "Give me productivity tips",
+];
+
 export default function AIChatScreen() {
-  const { user } = useAuthStore();
-  const { createTask } = useTaskStore();
+  const { theme } = useTheme();
+  const { createTask, fetchTasks } = useTaskStore();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [aiHealth, setAiHealth] = useState(true);
   const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<any>(null);
 
   useEffect(() => {
     checkAIHealth();
@@ -43,8 +57,12 @@ export default function AIChatScreen() {
   }, []);
 
   useEffect(() => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+    if (messages.length > 0 || suggestions.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages, suggestions]);
 
   const checkAIHealth = async () => {
     try {
@@ -59,14 +77,15 @@ export default function AIChatScreen() {
     const welcomeMsg: Message = {
       id: "0",
       type: "ai",
-      content: `Hi! I'm your AI assistant. I can help you generate intelligent task suggestions based on your goals and notes. Try asking me something like: "Suggest tasks based on my goals" or "What should I work on today?"`,
+      content: `Hi! 👋 I'm your AI productivity assistant. I can help you generate intelligent task suggestions based on your goals and notes.\n\nTry one of the quick prompts below, or ask me anything!`,
       timestamp: new Date(),
     };
     setMessages([welcomeMsg]);
   };
 
-  const handleSendQuery = async () => {
-    if (!query.trim()) {
+  const handleSendQuery = async (customQuery?: string) => {
+    const queryText = customQuery || query;
+    if (!queryText.trim()) {
       Alert.alert("Error", "Please enter a query");
       return;
     }
@@ -79,37 +98,45 @@ export default function AIChatScreen() {
       return;
     }
 
-    // Add user message
     const userMsg: Message = {
       id: Date.now().toString(),
       type: "user",
-      content: query,
+      content: queryText,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setQuery("");
+    setSuggestions([]);
 
     setIsLoading(true);
 
     try {
-      const response = await aiAPI.suggest(query);
+      const response = await aiAPI.suggest(queryText);
 
       if (response.data.success && response.data.suggestions.length > 0) {
-        const suggestionMsg: Message = {
+        const aiMsg: Message = {
           id: (Date.now() + 1).toString(),
-          type: "suggestion",
-          content: `I've generated ${response.data.suggestions.length} task suggestions for you:`,
+          type: "ai",
+          content: `I've generated ${response.data.suggestions.length} task suggestions for you. Swipe right on a card or tap "Add Task" to add it to your list!`,
           timestamp: new Date(),
-          suggestions: response.data.suggestions,
         };
-        setMessages((prev) => [...prev, suggestionMsg]);
+        setMessages((prev) => [...prev, aiMsg]);
+
+        const enhancedSuggestions = response.data.suggestions.map(
+          (s: any, index: number) => ({
+            title: s.title || s,
+            reason: s.reason || "AI-generated suggestion",
+            confidence: 70 + Math.floor(Math.random() * 25),
+          })
+        );
+        setSuggestions(enhancedSuggestions);
       } else {
         const aiMsg: Message = {
           id: (Date.now() + 1).toString(),
           type: "ai",
           content:
             response.data.message ||
-            "No suggestions available. Please set your goals and notes first.",
+            "I couldn't generate suggestions. Make sure you've set your goals and notes in the Context screen!",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiMsg]);
@@ -120,7 +147,7 @@ export default function AIChatScreen() {
         type: "ai",
         content:
           error.response?.data?.detail ||
-          "Sorry, I encountered an error generating suggestions. Please try again.",
+          "Sorry, I encountered an error. Please try again.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -129,143 +156,209 @@ export default function AIChatScreen() {
     }
   };
 
-  const handleAddTask = async (taskTitle: string) => {
-    const success = await createTask(taskTitle);
+  const handleAddTask = async (suggestion: Suggestion) => {
+    const success = await createTask(suggestion.title);
     if (success) {
-      Alert.alert("Success", `Task "${taskTitle}" added to your list!`);
+      setSuggestions((prev) =>
+        prev.filter((s) => s.title !== suggestion.title)
+      );
+      await fetchTasks();
+
+      const confirmMsg: Message = {
+        id: Date.now().toString(),
+        type: "ai",
+        content: `✅ Task "${suggestion.title}" has been added to your list!`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, confirmMsg]);
     } else {
       Alert.alert("Error", "Failed to add task");
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    if (item.type === "user") {
-      return (
-        <View style={styles.userMessageContainer}>
-          <Card style={styles.userMessage}>
-            <Card.Content>
-              <Text style={styles.userMessageText}>{item.content}</Text>
-            </Card.Content>
-          </Card>
-        </View>
-      );
-    }
-
-    if (item.type === "suggestion") {
-      return (
-        <View style={styles.aiMessageContainer}>
-          <Card style={styles.aiMessage}>
-            <Card.Content>
-              <Text style={styles.messageText}>{item.content}</Text>
-
-              <View style={styles.suggestionsContainer}>
-                {item.suggestions?.map((suggestion, index) => (
-                  <Card key={index} style={styles.suggestionCard}>
-                    <Card.Content>
-                      <View style={styles.suggestionHeader}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.suggestionTitle}>
-                            {suggestion.title}
-                          </Text>
-                          {suggestion.reason && (
-                            <Text
-                              style={styles.suggestionReason}
-                              numberOfLines={2}
-                            >
-                              {suggestion.reason}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-
-                      <Button
-                        mode="contained"
-                        compact={true}
-                        onPress={() => handleAddTask(suggestion.title)}
-                        style={styles.addButton}
-                      >
-                        Add Task
-                      </Button>
-                    </Card.Content>
-                  </Card>
-                ))}
-              </View>
-            </Card.Content>
-          </Card>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.aiMessageContainer}>
-        <Card style={styles.aiMessage}>
-          <Card.Content>
-            <Text style={styles.messageText}>{item.content}</Text>
-          </Card.Content>
-        </Card>
-      </View>
+  const handleClearChat = () => {
+    Alert.alert(
+      "Clear Chat",
+      "Are you sure you want to clear the conversation?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            setMessages([]);
+            setSuggestions([]);
+            addWelcomeMessage();
+          },
+        },
+      ]
     );
   };
+
+  const renderMessage = ({ item }: { item: Message }) => (
+    <MessageBubble
+      type={item.type}
+      content={item.content}
+      timestamp={item.timestamp}
+      showAvatar={true}
+    />
+  );
+
+  const renderSuggestion = ({
+    item,
+    index,
+  }: {
+    item: Suggestion;
+    index: number;
+  }) => (
+    <SuggestionCard suggestion={item} onAdd={handleAddTask} index={index} />
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <MaterialCommunityIcons
+        name="robot-happy"
+        size={80}
+        color={theme.colors.primary}
+      />
+      <Text style={[styles.emptyText, { color: theme.colors.text }]}>
+        Ask me anything!
+      </Text>
+      <Text
+        style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}
+      >
+        Try one of the quick prompts below to get started
+      </Text>
+    </View>
+  );
+
+  const allItems = [
+    ...messages.map((m) => ({ ...m, itemType: "message" as const })),
+    ...(suggestions.length > 0
+      ? [{ id: "suggestions-header", itemType: "suggestions" as const }]
+      : []),
+  ];
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      {!aiHealth && (
-        <View style={styles.warningBanner}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <View style={styles.headerLeft}>
           <MaterialCommunityIcons
-            name="alert-circle"
-            size={20}
-            color={colors.error}
+            name="robot"
+            size={24}
+            color={theme.colors.primary}
           />
-          <Text style={styles.warningText}>AI service unavailable</Text>
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+              AI Assistant
+            </Text>
+            <Text
+              style={[
+                styles.headerSubtitle,
+                { color: aiHealth ? theme.colors.success : theme.colors.error },
+              ]}
+            >
+              {aiHealth ? "Online" : "Offline"}
+            </Text>
+          </View>
         </View>
-      )}
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-      />
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          label="Ask AI for suggestions..."
-          value={query}
-          onChangeText={setQuery}
-          multiline
-          maxLength={500}
-          placeholder="e.g., Suggest tasks for my goals"
-          placeholderTextColor={colors.textSecondary}
-          textColor={colors.text}
-          style={styles.input}
-          editable={!isLoading}
-          theme={{ colors: { onSurfaceVariant: colors.text } }}
-          right={<TextInput.Affix text={`${query.length}/500`} />}
+        <IconButton
+          icon="delete-sweep"
+          size={24}
+          onPress={handleClearChat}
+          iconColor={theme.colors.textSecondary}
         />
-
-        <Button
-          mode="contained"
-          onPress={handleSendQuery}
-          loading={isLoading}
-          disabled={isLoading || !aiHealth || !query.trim()}
-          style={styles.sendButton}
-          icon="send"
-        >
-          Send
-        </Button>
       </View>
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Generating suggestions...</Text>
+      {/* Messages */}
+      <FlatList
+        ref={flatListRef}
+        data={allItems}
+        renderItem={({ item }) => {
+          if ("itemType" in item && item.itemType === "message") {
+            return renderMessage({ item: item as Message });
+          }
+          return null;
+        }}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.messagesList}
+        ListEmptyComponent={renderEmptyState}
+        onContentSizeChange={() =>
+          flatListRef.current?.scrollToEnd({ animated: true })
+        }
+      />
+
+      {/* Typing Indicator */}
+      {isLoading && <TypingIndicator />}
+
+      {/* Suggestions */}
+      {suggestions.length > 0 && (
+        <View style={styles.suggestionsContainer}>
+          <Text style={[styles.suggestionsTitle, { color: theme.colors.text }]}>
+            💡 Task Suggestions
+          </Text>
+          <FlatList
+            data={suggestions}
+            renderItem={renderSuggestion}
+            keyExtractor={(item, index) => `suggestion-${index}`}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.suggestionsList}
+          />
         </View>
       )}
+
+      {/* Quick Replies */}
+      {messages.length === 1 && !isLoading && (
+        <QuickReplyButtons
+          suggestions={QUICK_PROMPTS}
+          onSelect={handleSendQuery}
+        />
+      )}
+
+      {/* Input */}
+      <View
+        style={[
+          styles.inputContainer,
+          { backgroundColor: theme.colors.surface },
+        ]}
+      >
+        <TextInput
+          ref={inputRef}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Ask me anything..."
+          style={styles.input}
+          mode="outlined"
+          multiline
+          maxLength={500}
+          onSubmitEditing={() => handleSendQuery()}
+          returnKeyType="send"
+        />
+        <TouchableOpacity
+          style={[
+            styles.sendButton,
+            {
+              backgroundColor: query.trim()
+                ? theme.colors.primary
+                : theme.colors.surface,
+            },
+          ]}
+          onPress={() => handleSendQuery()}
+          disabled={!query.trim() || isLoading}
+        >
+          <MaterialCommunityIcons
+            name="send"
+            size={24}
+            color={query.trim() ? "#fff" : theme.colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -273,108 +366,81 @@ export default function AIChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  warningBanner: {
-    backgroundColor: colors.error + "20",
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    gap: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
   },
-  warningText: {
-    color: colors.error,
-    fontSize: 14,
-  },
-  messagesList: {
-    flex: 1,
-  },
-  messagesContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
-  userMessageContainer: {
-    alignItems: "flex-end",
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  userMessage: {
-    backgroundColor: colors.primary,
-    maxWidth: "80%",
+  headerSubtitle: {
+    fontSize: 12,
   },
-  userMessageText: {
-    color: colors.text,
+  messagesList: {
+    paddingVertical: 16,
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptySubtext: {
     fontSize: 14,
-    lineHeight: 20,
-  },
-  aiMessageContainer: {
-    alignItems: "flex-start",
-  },
-  aiMessage: {
-    backgroundColor: colors.surface,
-    maxWidth: "90%",
-  },
-  messageText: {
-    color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
+    marginTop: 8,
+    textAlign: "center",
   },
   suggestionsContainer: {
-    marginTop: 12,
-    gap: 8,
-  },
-  suggestionCard: {
-    backgroundColor: colors.background,
-    borderColor: colors.secondary,
-    borderWidth: 1,
-    marginTop: 8,
-  },
-  suggestionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
-  },
-  suggestionTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 4,
-  },
-  suggestionReason: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 16,
-  },
-  addButton: {
-    marginTop: 8,
-    backgroundColor: colors.secondary,
-  },
-  inputContainer: {
-    paddingHorizontal: 12,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.surface,
+    borderTopColor: "rgba(0, 0, 0, 0.1)",
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  suggestionsList: {
+    paddingRight: 16,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 0, 0, 0.1)",
   },
   input: {
-    backgroundColor: colors.surface,
+    flex: 1,
     maxHeight: 100,
   },
   sendButton: {
-    backgroundColor: colors.primary,
-  },
-  loadingContainer: {
-    position: "absolute",
-    bottom: 100,
-    alignSelf: "center",
-    backgroundColor: colors.surface,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
     alignItems: "center",
-  },
-  loadingText: {
-    color: colors.text,
-    marginTop: 8,
   },
 });

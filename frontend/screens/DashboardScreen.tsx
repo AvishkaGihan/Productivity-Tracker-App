@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect } from "react";
 import {
   Alert,
@@ -7,14 +6,25 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Button, Card, Divider, ProgressBar, Text } from "react-native-paper";
+import { FAB } from "react-native-paper";
+import {
+  AchievementBadges,
+  CircularProgress,
+  DashboardHeader,
+  MotivationalQuote,
+  QuickStat,
+  RecentActivity,
+  StreakCounter,
+  TodaysFocusCard,
+} from "../components/dashboard";
 import { useAuthStore } from "../store/auth-store";
 import { useTaskStore } from "../store/task-store";
-import { colors } from "../theme/colors";
+import { useTheme } from "../theme";
 
 export default function DashboardScreen({ navigation }: any) {
   const { user, logout } = useAuthStore();
-  const { stats, fetchStats, isLoading, fetchTasks } = useTaskStore();
+  const { stats, tasks, fetchStats, fetchTasks, updateTask } = useTaskStore();
+  const { theme } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
@@ -37,297 +47,190 @@ export default function DashboardScreen({ navigation }: any) {
       { text: "Cancel", style: "cancel" },
       {
         text: "Logout",
-        onPress: () => logout(),
         style: "destructive",
+        onPress: async () => {
+          await logout();
+          navigation.replace("Auth");
+        },
       },
     ]);
   };
 
-  const completionRate = stats?.completion_rate || 0;
-  const progressValue = completionRate / 100;
+  const handleTaskToggle = async (taskId: number, isCompleted: boolean) => {
+    await updateTask(taskId, undefined, isCompleted);
+    await fetchStats(); // Refresh stats after task update
+  };
+
+  const navigateToTasks = () => {
+    navigation.navigate("TaskList");
+  };
+
+  const navigateToAnalytics = () => {
+    navigation.navigate("Analytics");
+  };
+
+  const navigateToAIChat = () => {
+    navigation.navigate("AIChat");
+  };
+
+  const navigateToContext = () => {
+    navigation.navigate("Context");
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* User Welcome Card */}
-      <Card style={styles.welcomeCard}>
-        <Card.Content>
-          <View style={styles.welcomeHeader}>
-            <View>
-              <Text style={styles.greeting}>
-                Welcome, {user?.email.split("@")[0]}!
-              </Text>
-              <Text style={styles.date}>{new Date().toLocaleDateString()}</Text>
-            </View>
-            <Button
-              mode="text"
-              onPress={handleLogout}
-              compact
-              textColor={colors.error}
-            >
-              Logout
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <DashboardHeader
+          userName={user?.email?.split("@")[0] || "User"}
+          userEmail={user?.email || ""}
+          onLogout={handleLogout}
+        />
 
-      {/* Progress Card */}
-      <Card style={styles.progressCard}>
-        <Card.Content>
-          <View style={styles.progressHeader}>
-            <MaterialCommunityIcons
-              name="target"
-              size={24}
-              color={colors.secondary}
-            />
-            <Text style={styles.progressTitle}>Today's Progress</Text>
-          </View>
-          <Divider style={styles.divider} />
-
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats?.total_tasks || 0}</Text>
-              <Text style={styles.statLabel}>Total Tasks</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.success }]}>
-                {stats?.completed_tasks || 0}
-              </Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.accent }]}>
-                {stats?.pending_tasks || 0}
-              </Text>
-              <Text style={styles.statLabel}>Pending</Text>
-            </View>
-          </View>
-
+        <View style={styles.content}>
+          {/* Progress Section */}
           <View style={styles.progressSection}>
-            <View style={styles.progressLabelRow}>
-              <Text style={styles.progressLabel}>Completion Rate</Text>
-              <Text style={styles.progressPercent}>
-                {Math.round(completionRate)}%
-              </Text>
+            <CircularProgress
+              progress={stats?.completion_rate || 0}
+              size={120}
+              strokeWidth={12}
+              color={theme.colors.primary}
+            />
+            <View style={styles.statsGrid}>
+              <QuickStat
+                label="Total Tasks"
+                value={stats?.total_tasks || 0}
+                icon="clipboard-list"
+                color={theme.colors.primary}
+              />
+              <QuickStat
+                label="Completed"
+                value={stats?.completed_tasks || 0}
+                icon="check-circle"
+                color={theme.colors.success}
+              />
+              <QuickStat
+                label="Pending"
+                value={stats?.pending_tasks || 0}
+                icon="clock-outline"
+                color={theme.colors.warning}
+              />
             </View>
-            <ProgressBar
-              progress={progressValue}
-              color={colors.primary}
-              style={styles.progressBar}
+          </View>
+
+          {/* Motivational Quote */}
+          <MotivationalQuote />
+
+          {/* Today's Focus */}
+          <TodaysFocusCard
+            tasks={tasks.slice(0, 3).map((task) => ({
+              id: task.id.toString(),
+              title: task.title,
+              completed: task.is_completed,
+            }))}
+            onTaskComplete={(taskId) =>
+              handleTaskToggle(
+                parseInt(taskId),
+                !tasks.find((t) => t.id.toString() === taskId)?.is_completed
+              )
+            }
+            onViewAll={navigateToTasks}
+          />
+
+          {/* Recent Activity */}
+          <RecentActivity
+            activities={tasks.slice(0, 5).map((task) => ({
+              id: task.id.toString(),
+              type: task.is_completed
+                ? ("completed" as const)
+                : ("created" as const),
+              title: task.title,
+              timestamp: task.created_at || new Date().toISOString(),
+            }))}
+          />
+
+          {/* Achievements and Streaks */}
+          <View style={styles.bottomSection}>
+            <AchievementBadges
+              achievements={[
+                {
+                  id: "1",
+                  icon: "star",
+                  title: "First Task",
+                  description: "Complete your first task",
+                  unlocked: tasks.length > 0,
+                },
+                {
+                  id: "2",
+                  icon: "fire",
+                  title: "5 Day Streak",
+                  description: "Complete tasks for 5 days in a row",
+                  unlocked: false, // TODO: Calculate actual streak
+                },
+                {
+                  id: "3",
+                  icon: "trophy",
+                  title: "Task Master",
+                  description: "Complete 50 tasks",
+                  unlocked: (stats?.completed_tasks || 0) >= 50,
+                  progress: Math.min(
+                    ((stats?.completed_tasks || 0) / 50) * 100,
+                    100
+                  ),
+                },
+              ]}
+            />
+            <StreakCounter
+              currentStreak={7} // TODO: Calculate actual streak
+              bestStreak={12} // TODO: Calculate best streak
             />
           </View>
-        </Card.Content>
-      </Card>
+        </View>
+      </ScrollView>
 
-      {/* Quick Actions */}
-      <Card style={styles.actionsCard}>
-        <Card.Content>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <Divider style={styles.divider} />
-
-          <View style={styles.buttonRow}>
-            <Button
-              mode="outlined"
-              onPress={() => navigation.navigate("Tasks")}
-              style={styles.actionButton}
-              icon="checkbox-marked-outline"
-            >
-              View Tasks
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={() => navigation.navigate("AI")}
-              style={styles.actionButton}
-              icon="robot"
-            >
-              Get Suggestions
-            </Button>
-          </View>
-
-          <View style={styles.buttonRow}>
-            <Button
-              mode="outlined"
-              onPress={() => navigation.navigate("Analytics")}
-              style={styles.actionButton}
-              icon="chart-line"
-            >
-              Analytics
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={() => navigation.navigate("Context")}
-              style={styles.actionButton}
-              icon="target"
-            >
-              My Goals
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Goals & Notes Preview */}
-      {(user?.goals || user?.notes) && (
-        <Card style={styles.infoCard}>
-          <Card.Content>
-            <Text style={styles.sectionTitle}>Your Context</Text>
-            <Divider style={styles.divider} />
-
-            {user?.goals && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>Goals</Text>
-                <Text style={styles.infoText} numberOfLines={3}>
-                  {user.goals}
-                </Text>
-              </View>
-            )}
-
-            {user?.notes && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>Notes</Text>
-                <Text style={styles.infoText} numberOfLines={3}>
-                  {user.notes}
-                </Text>
-              </View>
-            )}
-
-            <Button
-              mode="text"
-              onPress={() => navigation.navigate("Context")}
-              style={styles.editButton}
-            >
-              Edit Context
-            </Button>
-          </Card.Content>
-        </Card>
-      )}
-    </ScrollView>
+      {/* Floating Action Button */}
+      <FAB
+        icon="plus"
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        onPress={() => navigation.navigate("TaskList")}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
     padding: 16,
   },
-  welcomeCard: {
-    backgroundColor: colors.surface,
-    marginBottom: 16,
-  },
-  welcomeHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  progressSection: {
     alignItems: "center",
-  },
-  greeting: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: colors.text,
-  },
-  date: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  progressCard: {
-    backgroundColor: colors.surface,
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  progressTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.text,
-    marginLeft: 12,
-  },
-  divider: {
-    marginVertical: 12,
-    backgroundColor: colors.textSecondary,
+    marginBottom: 24,
   },
   statsGrid: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginBottom: 16,
+    width: "100%",
+    marginTop: 24,
   },
-  statItem: {
-    alignItems: "center",
+  bottomSection: {
+    marginTop: 16,
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: colors.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  progressSection: {
-    marginTop: 12,
-  },
-  progressLabelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  progressPercent: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: colors.primary,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-  },
-  actionsCard: {
-    backgroundColor: colors.surface,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.text,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginVertical: 8,
-  },
-  actionButton: {
-    flex: 1,
-    borderColor: colors.primary,
-  },
-  infoCard: {
-    backgroundColor: colors.surface,
-    marginBottom: 32,
-  },
-  infoSection: {
-    marginBottom: 16,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: colors.secondary,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.text,
-    lineHeight: 20,
-  },
-  editButton: {
-    marginTop: 8,
+  fab: {
+    position: "absolute",
+    margin: 16,
+    right: 0,
+    bottom: 0,
   },
 });
