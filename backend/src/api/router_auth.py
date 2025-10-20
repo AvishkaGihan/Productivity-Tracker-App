@@ -3,9 +3,9 @@ Authentication API endpoints - Register, Login, Get Current User
 """
 
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.repository.database import get_db
@@ -27,30 +27,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-# ============================================================================
-# DEPENDENCY: Get Token from Header
-# ============================================================================
-
-
-def get_token_from_header(authorization: Optional[str]) -> str:
-    """Extract and validate Bearer token from Authorization header"""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return parts[1]
+# Security scheme for OpenAPI documentation
+security = HTTPBearer()
 
 
 # ============================================================================
@@ -131,14 +109,15 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     },
 )
 async def get_current_user_profile(
-    authorization: Optional[str] = Header(None), db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
 ):
     """
     Get current authenticated user's profile
 
     Requires valid JWT token in Authorization header: Bearer <token>
     """
-    token = get_token_from_header(authorization)
+    token = credentials.credentials
 
     user = get_current_user(db, token)
     if not user:
@@ -162,15 +141,14 @@ async def get_current_user_profile(
     status_code=status.HTTP_200_OK,
     responses={200: {"description": "Logout successful"}},
 )
-async def logout(authorization: Optional[str] = Header(None)):
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Logout endpoint (token is managed on frontend)
 
     - Frontend should delete the stored token
     - This endpoint is mainly for documentation purposes
     """
-    get_token_from_header(authorization)
-
+    # Token validation is handled by HTTPBearer dependency
     logger.info("User logged out")
     return {
         "message": "Logged out successfully",

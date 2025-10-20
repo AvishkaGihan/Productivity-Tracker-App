@@ -6,6 +6,7 @@ Handles context retrieval, prompt construction, and AI response parsing
 import json
 import logging
 import os
+import re
 from typing import List
 
 from langchain_core.output_parsers import JsonOutputParser
@@ -46,16 +47,17 @@ User's Query:
 
 Please generate 3-5 specific, actionable task suggestions that align with the user's goals and context.
 
-Return your response as a JSON array with the following structure:
+IMPORTANT: Return ONLY a valid JSON array. Do not include any other text, explanations, or markdown.
+Escape all special characters properly (quotes, newlines, etc.).
+
+Expected JSON format:
 [
-  {{
-    "title": "Task title",
-    "reason": "Why this task aligns with their goals"
-  }},
-  ...
+  {{"title": "Task title here", "reason": "Why this task aligns with their goals"}},
+  {{"title": "Another task", "reason": "Reason for this task"}},
+  {{"title": "Third task", "reason": "Another reason"}}
 ]
 
-Only return valid JSON, no additional text.
+Return only the JSON array, nothing else.
 """
 
 # ============================================================================
@@ -107,8 +109,8 @@ class LangChainService:
 
             response_text = response_text.strip()
 
-            # Parse JSON
-            suggestions_data = json.loads(response_text)
+            # Parse JSON with strict=False to be more lenient
+            suggestions_data = json.loads(response_text, strict=False)
 
             # Ensure it's a list
             if not isinstance(suggestions_data, list):
@@ -129,10 +131,49 @@ class LangChainService:
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing AI response as JSON: {str(e)}")
             logger.debug(f"Raw response: {response_text}")
-            return []
+
+            # Fallback: Try to extract task suggestions using regex as a last resort
+            return self._fallback_parse(response_text)
         except Exception as e:
             logger.error(f"Error parsing AI response: {str(e)}")
             return []
+
+    def _fallback_parse(self, response_text: str) -> List[SuggestedTask]:
+        """
+        Fallback parser when JSON parsing fails
+        Attempts to extract task information using pattern matching
+
+        Args:
+            response_text: Raw response text
+
+        Returns:
+            List of SuggestedTask objects
+        """
+        suggestions = []
+        try:
+            # Try to find title/reason patterns in the text
+            # Pattern 1: Look for "title": "..." and "reason": "..." pairs
+            title_pattern = r'"title"\s*:\s*"([^"]*)"'
+            reason_pattern = r'"reason"\s*:\s*"([^"]*)"'
+
+            titles = re.findall(title_pattern, response_text)
+            reasons = re.findall(reason_pattern, response_text)
+
+            # Match titles with reasons
+            for i, title in enumerate(titles):
+                reason = reasons[i] if i < len(reasons) else "AI-generated suggestion"
+                if title.strip():
+                    suggestions.append(
+                        SuggestedTask(title=title.strip(), reason=reason.strip())
+                    )
+
+            if suggestions:
+                logger.info(f"Fallback parser extracted {len(suggestions)} suggestions")
+
+        except Exception as e:
+            logger.error(f"Fallback parser failed: {str(e)}")
+
+        return suggestions
 
     def generate_suggestions(
         self, db: Session, user_id: int, query: str
@@ -206,7 +247,7 @@ class LangChainService:
             else:
                 response_text = str(response)
 
-            logger.debug(f"AI Response: {response_text}")
+            logger.debug(f"AI Response (first 200 chars): {response_text[:200]}...")
 
             # Parse response
             suggestions = self._parse_ai_response(str(response_text))
@@ -215,6 +256,15 @@ class LangChainService:
             query_context = (
                 f"Goals: {goals or 'None set'} | Notes: {notes or 'None set'}"
             )
+
+            # Return response with appropriate message
+            if not suggestions:
+                return AISuggestionResponse(
+                    success=True,
+                    suggestions=[],
+                    message="Unable to generate suggestions from AI response. Please try rephrasing your query.",
+                    query_context=query_context,
+                )
 
             return AISuggestionResponse(
                 success=True,

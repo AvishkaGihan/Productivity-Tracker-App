@@ -110,7 +110,14 @@ def get_user_id_from_token(token: str) -> Optional[int]:
     """
     payload = decode_token(token)
     if payload:
-        return payload.get("sub")
+        user_id = payload.get("sub")
+        if user_id:
+            try:
+                # Convert string user ID back to integer
+                return int(user_id)
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid user ID format in token: {user_id}")
+                return None
     return None
 
 
@@ -205,8 +212,8 @@ def create_token_response(user: User) -> TokenResponse:
     Returns:
         TokenResponse with access token and user data
     """
-    # Create access token
-    access_token = create_access_token(data={"sub": user.id})
+    # Create access token with user ID as string (JWT standard requires string for 'sub' claim)
+    access_token = create_access_token(data={"sub": str(user.id)})
 
     # Create response
     return TokenResponse(
