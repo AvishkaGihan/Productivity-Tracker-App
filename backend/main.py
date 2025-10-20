@@ -5,6 +5,7 @@ Main application entry point with FastAPI setup and middleware configuration
 
 import logging
 import os
+import warnings
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -15,6 +16,8 @@ from src.api.router_auth import router as router_auth
 from src.api.router_context import router as router_context
 from src.api.router_tasks import router as router_tasks
 from src.repository.database import init_db
+
+warnings.filterwarnings("ignore", message=".*pydantic.*", category=DeprecationWarning)
 
 # Load environment variables
 load_dotenv()
