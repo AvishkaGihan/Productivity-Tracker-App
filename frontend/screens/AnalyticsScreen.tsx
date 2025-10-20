@@ -1,12 +1,22 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Card, Divider, ProgressBar, Text } from "react-native-paper";
+import { FAB, SegmentedButtons, Text } from "react-native-paper";
+import {
+  CategoryDistribution,
+  CompletionTrendChart,
+  ProductivityHeatmap,
+  StatsOverview,
+  StreakVisualization,
+} from "../components/analytics";
 import { useTaskStore } from "../store/task-store";
-import { colors } from "../theme/colors";
+import { useTheme } from "../theme/ThemeContext";
+
+type TimeRange = "week" | "month";
 
 export default function AnalyticsScreen() {
-  const { stats, fetchStats } = useTaskStore();
+  const { theme } = useTheme();
+  const { tasks, stats, fetchStats } = useTaskStore();
+  const [timeRange, setTimeRange] = useState<TimeRange>("week");
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -19,310 +29,240 @@ export default function AnalyticsScreen() {
     setRefreshing(false);
   };
 
-  const completionRate = stats?.completion_rate || 0;
-  const progressValue = completionRate / 100;
+  // Calculate analytics data
+  const analyticsData = useMemo(() => {
+    const now = new Date();
+    const days = timeRange === "week" ? 7 : 30;
+
+    // Completion trend data
+    const trendData: number[] = [];
+    const trendLabels: string[] = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+
+      const dayTasks = tasks.filter((task) => {
+        const taskDate = new Date(task.created_at);
+        return taskDate.toDateString() === date.toDateString();
+      });
+
+      const completedCount = dayTasks.filter((t) => t.is_completed).length;
+      trendData.push(completedCount);
+
+      if (timeRange === "week") {
+        trendLabels.push(
+          ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()]
+        );
+      } else {
+        trendLabels.push(String(date.getDate()));
+      }
+    }
+
+    // Category distribution - mock data since tasks don't have categories yet
+    const categoryData = [
+      { name: "Work", count: Math.floor(tasks.length * 0.4), color: "#007AFF" },
+      {
+        name: "Personal",
+        count: Math.floor(tasks.length * 0.3),
+        color: "#5856D6",
+      },
+      {
+        name: "Health",
+        count: Math.floor(tasks.length * 0.2),
+        color: "#34C759",
+      },
+      {
+        name: "Learning",
+        count: Math.floor(tasks.length * 0.1),
+        color: "#FF9500",
+      },
+    ];
+
+    // Stats overview
+    const totalTasks = stats?.total_tasks || 0;
+    const completedTasks = stats?.completed_tasks || 0;
+    const completionRate =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const prevWeekCompletion = 45; // Mock data - calculate from previous week
+    const trend = completionRate - prevWeekCompletion;
+
+    const statsData = [
+      {
+        label: "Total Tasks",
+        value: totalTasks,
+        icon: "checkbox-multiple-marked-outline",
+        trend: 12,
+        color: theme.colors.primary,
+      },
+      {
+        label: "Completed",
+        value: completedTasks,
+        icon: "check-circle",
+        trend: 8,
+        color: theme.colors.success,
+      },
+      {
+        label: "Pending",
+        value: stats?.pending_tasks || 0,
+        icon: "clock-outline",
+        trend: -5,
+        color: theme.colors.accent,
+      },
+      {
+        label: "Completion Rate",
+        value: `${completionRate}%`,
+        icon: "chart-line",
+        trend,
+        color: theme.colors.secondary,
+      },
+    ];
+
+    // Streak data
+    const currentStreak = 5; // Mock - calculate from actual task completion
+    const longestStreak = 12; // Mock - calculate from history
+    const weekData = [true, true, false, true, true, true, false]; // Last 7 days
+
+    // Heatmap data (7 weeks x 7 days)
+    const heatmapData: number[][] = [];
+    for (let week = 0; week < 7; week++) {
+      const weekData: number[] = [];
+      for (let day = 0; day < 7; day++) {
+        weekData.push(Math.floor(Math.random() * 10)); // Mock data
+      }
+      heatmapData.push(weekData);
+    }
+
+    return {
+      trendData,
+      trendLabels,
+      categoryData,
+      statsData,
+      currentStreak,
+      longestStreak,
+      weekData,
+      heatmapData,
+    };
+  }, [tasks, stats, timeRange, theme]);
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* Main Stats Card */}
-      <Card style={styles.mainCard}>
-        <Card.Content>
-          <View style={styles.header}>
-            <MaterialCommunityIcons
-              name="chart-line"
-              size={24}
-              color={colors.secondary}
-            />
-            <Text style={styles.cardTitle}>Task Analytics</Text>
-          </View>
-          <Divider style={styles.divider} />
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text
+            variant="headlineMedium"
+            style={[styles.title, { color: theme.colors.text }]}
+          >
+            Analytics & Insights
+          </Text>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Track your productivity trends
+          </Text>
+        </View>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats?.total_tasks || 0}</Text>
-              <Text style={styles.statLabel}>Total Tasks</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statNumber, { color: colors.success }]}>
-                {stats?.completed_tasks || 0}
-              </Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statNumber, { color: colors.accent }]}>
-                {stats?.pending_tasks || 0}
-              </Text>
-              <Text style={styles.statLabel}>Pending</Text>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
+        {/* Time Range Selector */}
+        <View style={styles.timeRangeContainer}>
+          <SegmentedButtons
+            value={timeRange}
+            onValueChange={(value) => setTimeRange(value as TimeRange)}
+            buttons={[
+              {
+                value: "week",
+                label: "Week",
+                icon: "calendar-week",
+              },
+              {
+                value: "month",
+                label: "Month",
+                icon: "calendar-month",
+              },
+            ]}
+            style={{ backgroundColor: theme.colors.surface }}
+          />
+        </View>
 
-      {/* Completion Progress */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <View style={styles.progressHeader}>
-            <MaterialCommunityIcons
-              name="target-variant"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={styles.progressTitle}>Completion Progress</Text>
-          </View>
-          <Divider style={styles.divider} />
+        {/* Stats Overview */}
+        <StatsOverview stats={analyticsData.statsData} />
 
-          <View style={styles.progressContainer}>
-            <View style={styles.progressLabelRow}>
-              <Text style={styles.label}>Overall Progress</Text>
-              <Text style={styles.percentText}>
-                {Math.round(completionRate)}%
-              </Text>
-            </View>
-            <ProgressBar
-              progress={progressValue}
-              color={colors.primary}
-              style={styles.progressBar}
-            />
+        {/* Streak Visualization */}
+        <StreakVisualization
+          currentStreak={analyticsData.currentStreak}
+          longestStreak={analyticsData.longestStreak}
+          weekData={analyticsData.weekData}
+        />
 
-            <View style={styles.progressDetail}>
-              <View style={styles.detailRow}>
-                <View
-                  style={[styles.colorDot, { backgroundColor: colors.success }]}
-                />
-                <Text style={styles.detailText}>
-                  {stats?.completed_tasks} completed out of {stats?.total_tasks}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
+        {/* Completion Trend Chart */}
+        <CompletionTrendChart
+          data={analyticsData.trendData}
+          labels={analyticsData.trendLabels}
+          title={`Completion Trend (${
+            timeRange === "week" ? "Last 7 Days" : "Last 30 Days"
+          })`}
+        />
 
-      {/* Insights */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <View style={styles.insightHeader}>
-            <MaterialCommunityIcons
-              name="lightbulb"
-              size={20}
-              color={colors.accent}
-            />
-            <Text style={styles.progressTitle}>Insights</Text>
-          </View>
-          <Divider style={styles.divider} />
+        {/* Category Distribution */}
+        <CategoryDistribution
+          data={analyticsData.categoryData}
+          title="Tasks by Category"
+        />
 
-          <View style={styles.insightBox}>
-            {stats && stats.total_tasks === 0 ? (
-              <Text style={styles.insightText}>
-                Start creating tasks to track your productivity!
-              </Text>
-            ) : stats && completionRate >= 80 ? (
-              <Text style={styles.insightText}>
-                🎉 Great job! You're on fire with a {Math.round(completionRate)}
-                % completion rate!
-              </Text>
-            ) : stats && completionRate >= 50 ? (
-              <Text style={styles.insightText}>
-                💪 Good progress! Keep going to reach 100% completion.
-              </Text>
-            ) : (
-              <Text style={styles.insightText}>
-                📈 You're just getting started. Focus on completing those
-                pending tasks!
-              </Text>
-            )}
-          </View>
-        </Card.Content>
-      </Card>
+        {/* Productivity Heatmap */}
+        <ProductivityHeatmap
+          data={analyticsData.heatmapData}
+          title="Productivity Heatmap (Last 7 Weeks)"
+        />
 
-      {/* Productivity Tips */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <View style={styles.tipsHeader}>
-            <MaterialCommunityIcons
-              name="star"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={styles.progressTitle}>Tips to Improve</Text>
-          </View>
-          <Divider style={styles.divider} />
+        {/* Bottom spacing */}
+        <View style={{ height: 80 }} />
+      </ScrollView>
 
-          <View style={styles.tipsList}>
-            <View style={styles.tipItem}>
-              <Text style={styles.tipNumber}>1</Text>
-              <Text style={styles.tipText}>
-                Break large tasks into smaller ones
-              </Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Text style={styles.tipNumber}>2</Text>
-              <Text style={styles.tipText}>
-                Use AI to generate smart task suggestions
-              </Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Text style={styles.tipNumber}>3</Text>
-              <Text style={styles.tipText}>Update your goals regularly</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Text style={styles.tipNumber}>4</Text>
-              <Text style={styles.tipText}>
-                Check off completed tasks daily
-              </Text>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
-    </ScrollView>
+      {/* Export/Share FAB */}
+      <FAB
+        icon="share-variant"
+        label="Share Stats"
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        onPress={() => {
+          // TODO: Implement share functionality
+          console.log("Share stats");
+        }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
     padding: 16,
   },
-  mainCard: {
-    backgroundColor: colors.surface,
-    marginBottom: 16,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    marginBottom: 16,
-  },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 20,
   },
-  cardTitle: {
-    fontSize: 18,
+  title: {
     fontWeight: "bold",
-    color: colors.text,
-    marginLeft: 12,
+    marginBottom: 4,
   },
-  divider: {
-    marginVertical: 12,
+  timeRangeContainer: {
+    marginBottom: 20,
   },
-  statsGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  statBox: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: colors.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.text,
-    marginLeft: 8,
-  },
-  progressContainer: {
-    marginTop: 12,
-  },
-  progressLabelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  percentText: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: colors.primary,
-  },
-  progressBar: {
-    height: 10,
-    borderRadius: 5,
-    marginBottom: 12,
-  },
-  progressDetail: {
-    marginTop: 8,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  insightHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  insightBox: {
-    marginTop: 12,
-    backgroundColor: colors.background,
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent,
-  },
-  insightText: {
-    fontSize: 14,
-    color: colors.text,
-    lineHeight: 20,
-  },
-  tipsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  tipsList: {
-    marginTop: 12,
-    gap: 12,
-  },
-  tipItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  tipNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    color: colors.background,
-    textAlign: "center",
-    lineHeight: 24,
-    fontWeight: "bold",
-    fontSize: 12,
-  },
-  tipText: {
-    fontSize: 13,
-    color: colors.text,
-    flex: 1,
-    lineHeight: 20,
+  fab: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
   },
 });
