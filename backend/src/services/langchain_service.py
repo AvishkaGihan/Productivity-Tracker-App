@@ -9,6 +9,7 @@ import os
 import re
 from typing import List
 
+from dotenv import load_dotenv
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 
@@ -20,6 +21,9 @@ from src.repository.repositories import UserRepository
 from src.schemas import AISuggestionResponse, SuggestedTask
 
 logger = logging.getLogger(__name__)
+
+# Ensure environment variables are loaded
+load_dotenv()
 
 # Initialize Gemini LLM
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")

@@ -16,7 +16,7 @@ from src.api.router_context import router as router_context
 from src.api.router_tasks import router as router_tasks
 from src.repository.database import init_db
 
-# Load environment variables
+# Load environment variables early so they're available for submodules
 load_dotenv()
 
 # Setup logging
