@@ -128,6 +128,7 @@ export default function ContextScreen() {
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
             style={styles.textInput}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
           />
 
           <Text style={styles.charCount}>{goals.length}/1000</Text>
@@ -157,6 +158,7 @@ export default function ContextScreen() {
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
             style={styles.textInput}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
           />
 
           <Text style={styles.charCount}>{notes.length}/1000</Text>

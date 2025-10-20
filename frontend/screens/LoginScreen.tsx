@@ -51,6 +51,7 @@ export default function LoginScreen({ navigation }: any) {
             style={styles.input}
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
           />
 
           <TextInput
@@ -62,6 +63,7 @@ export default function LoginScreen({ navigation }: any) {
             placeholder="••••••••"
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
             right={
               <TextInput.Icon
                 icon={showPassword ? "eye-off" : "eye"}

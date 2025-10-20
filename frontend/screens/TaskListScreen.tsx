@@ -208,6 +208,7 @@ export default function TaskListScreen() {
               placeholderTextColor={colors.textSecondary}
               textColor={colors.text}
               style={styles.modalInput}
+              theme={{ colors: { onSurfaceVariant: colors.text } }}
             />
 
             <View style={styles.modalButtons}>

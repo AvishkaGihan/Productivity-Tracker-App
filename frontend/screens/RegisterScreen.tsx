@@ -65,6 +65,7 @@ export default function RegisterScreen({ navigation }: any) {
             style={styles.input}
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
           />
 
           <TextInput
@@ -76,6 +77,7 @@ export default function RegisterScreen({ navigation }: any) {
             placeholder="Minimum 8 characters"
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
             right={
               <TextInput.Icon
                 icon={showPassword ? "eye-off" : "eye"}
@@ -93,6 +95,7 @@ export default function RegisterScreen({ navigation }: any) {
             placeholder="••••••••"
             placeholderTextColor={colors.textSecondary}
             textColor={colors.text}
+            theme={{ colors: { onSurfaceVariant: colors.text } }}
           />
 
           <Button

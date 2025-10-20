@@ -244,6 +244,7 @@ export default function AIChatScreen() {
           textColor={colors.text}
           style={styles.input}
           editable={!isLoading}
+          theme={{ colors: { onSurfaceVariant: colors.text } }}
           right={<TextInput.Affix text={`${query.length}/500`} />}
         />
 
