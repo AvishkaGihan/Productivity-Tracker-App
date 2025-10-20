@@ -7,11 +7,12 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import AuthNavigator from "./navigation/AuthNavigator";
 import MainNavigator from "./navigation/MainNavigator";
 import { useAuthStore } from "./store/auth-store";
-import { colors } from "./theme/colors";
+import { ThemeProvider, useTheme } from "./theme";
 
-export default function App() {
+function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const { isAuthenticated, checkAuth } = useAuthStore();
+  const { theme } = useTheme();
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -24,28 +25,34 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <SafeAreaProvider>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: colors.background,
-          }}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaProvider>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: theme.colors.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
     );
   }
 
   return (
+    <PaperProvider theme={{ colors: theme.colors as any }}>
+      <NavigationContainer>
+        {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+    </PaperProvider>
+  );
+}
+
+export default function App() {
+  return (
     <SafeAreaProvider>
-      <PaperProvider theme={{ colors }}>
-        <NavigationContainer>
-          {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
-        </NavigationContainer>
-      </PaperProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
